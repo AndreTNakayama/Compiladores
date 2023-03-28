@@ -5,6 +5,8 @@
 typedef enum {
 	MAIS,
 	MENOS,
+	VEZES,
+	DIVIDIR,
 	INDETERMINADO
 } Token;
 
@@ -31,11 +33,25 @@ Info * tokenizar(FILE *entrada, int* count) {
 				tokens_count++;
 				tokens = realloc(tokens, sizeof(Info ) * (tokens_count + 1));
 				tokens[tokens_count - 1].tipo = MAIS;
+				tokens[tokens_count - 1].valor = c;
 				break;
 			case '-':
 				tokens_count++;
 				tokens = realloc(tokens, sizeof(Info ) * (tokens_count + 1));
 				tokens[tokens_count - 1].tipo = MENOS;
+				tokens[tokens_count - 1].valor = c;
+				break;
+			case '*':
+				tokens_count++;
+				tokens = realloc(tokens, sizeof(Info ) * (tokens_count + 1));
+				tokens[tokens_count - 1].tipo = VEZES;
+				tokens[tokens_count - 1].valor = c;
+				break;
+			case '/':
+				tokens_count++;
+				tokens = realloc(tokens, sizeof(Info ) * (tokens_count + 1));
+				tokens[tokens_count - 1].tipo = DIVIDIR;
+				tokens[tokens_count - 1].valor = c;
 				break;
 			case ' ':
 				break;
@@ -67,10 +83,16 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < tokens_count; i++) {
 		switch (tokens[i].tipo) {
 			case MAIS:
-				printf("Mais\n");
+				printf("+\n");
 				break;
 			case MENOS:
-				printf("Menos\n");
+				printf("-\n");
+				break;
+			case VEZES:
+				printf("×\n");
+				break;
+			case DIVIDIR:
+				printf("÷\n");
 				break;
 			case INDETERMINADO:
 				printf("Indeterminado('%c')\n", tokens[i].valor);

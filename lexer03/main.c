@@ -4,172 +4,175 @@
 
 #define MAX 10000
 
+// Criação dos Tokens
 typedef enum {
-	ZERO,
-	UM,
-	DOIS,
-	TRES,
-	QUATRO,
-	CINCO,
-	SEIS,
-	SETE,
-	OITO,
-	NOVE,
-	PONTO,
-	VIRGULA,
-	INDETERMINADO,
-	ESPACO,
+	NUMERO,
 	SOMA,
 	SUBTRACAO,
-	DIVISAO,
 	MULTIPLICACAO,
+	DIVISAO,
 	POTENCIA,
+	INDETERMINADO,
+	ERRO
 } Token;
 
+// Dados dentro do Token
 typedef struct {
 	Token tipo;
-	int valor;
+	char * valor;
 } Info ;
 
-Info * tokenizar(FILE *entrada, int* count) {
-	Info * tokens = malloc(sizeof(Info ));
-	int tokens_count = 0;
-	
-	size_t v_Ponto = 0;
-	size_t v_Virgula = 0;
-	
-	size_t tamanho = 0;
-	for (char x = getc(entrada); x != EOF; x = getc(entrada)) {
-    tamanho = tamanho + 1;
-  }
-	
-	rewind(entrada);
+// Função utilizada para verificar se é um número válido ou uma operação
+int verificacao(char * palavra) {
+	int v_Ponto = 0;
+	int v_Virgula = 0;
 
-	// printf("Tamanho: %d\n", tamanho);
-	int contador = 0;
-	for (int i = 0; i < tamanho; i++) {
-		char c = fgetc(entrada);
+	char numeros[12] = {'0','1','2','3','4','5','6','7','8','9','.',','};
+	char simbolos[4] = {'+', '-', '*', '/'};
 
-		if(c == '*') contador++;
+	for(int i = 0; i < strlen(palavra); i++){
+		char v_Numero = 'F';
 		
-		else if (c == ' '){
-			tokens_count++;
-			tokens[tokens_count - 1].tipo = ESPACO;
-			tokens[tokens_count - 1].valor = c;
+		if(palavra[i] == '.'){
+			v_Ponto++;
+		}
+
+		if(palavra[i] == ','){
+			v_Virgula++;
+		}
+
+		// Enquanto v_Numero for igual a 'T' é um número válido
+		for(int j = 0; j < 12; j++){
+			if (palavra[i] == numeros[j]){
+				v_Numero = 'T';
+			}
+		}
+
+		if(v_Numero == 'T'){
 			continue;
 		}
-		else
-		{
+		else{
+			// Nao é um numero, então vamos verificar se é uma operação
+			for(int j = 0; j < 4; j++){
+				if (palavra[i] == simbolos[j]) return 2;
+			}
+			
+			return 0;
+		}
+	}
+
+	// Se ele for um número, verifica se tem mais de 1 ponto ou mais de 1 vírgula
+	if(v_Ponto <= 1 && v_Virgula <= 1)
+		return 1;
+	else
+		return 0;
+}
+
+// Função responsável por retornar o Token com os dados
+Info * lexer(FILE * file, int* count) {
+	// Criação da variavel para controle dos Tokens
+	Info *tokens = malloc(sizeof(Info));
+  int tokens_count = 0;
+
+	// Enquanto existir palavras para serem lidas dentro do arquivo de entrada
+	while(!feof(file)){
+		char palavra[MAX];
+		int retorno;
+
+		// Passa a palavra lida dentro do arquivo do tipo FILE para um vetor do tipo char
+		int scan = fscanf(file, "%s", palavra);
+		
+		retorno = verificacao(palavra);
+
+		// Se o retorno é 1 significa que é um número
+		if(retorno == 1){
+			// Contador de Token recebe +1, pois será adicionado um novo Token
 			tokens_count++;
+			// Realocamos memório pois temos um novo elemento a ser inserido
 			tokens = realloc(tokens, sizeof(Info ) * (tokens_count + 1));
-			if(contador != 0){
-				switch (contador) {
-					case 1:
-						tokens[tokens_count - 1].tipo = MULTIPLICACAO;
-						tokens[tokens_count - 1].valor = c;
-						break;
-					case 2:
-						tokens[tokens_count - 1].tipo = POTENCIA;
-						tokens[tokens_count - 1].valor = c;
-						break;
-					default:
-						tokens[tokens_count - 1].tipo = INDETERMINADO;
-						tokens[tokens_count - 1].valor = c;
-						*count = tokens_count;
-						return tokens;
+			// Como o controle começa com a variável 0, temos que fazer o tokens_count - 1 para colocar o novo elemento na posição correta
+			tokens[tokens_count - 1].tipo = NUMERO;
+			tokens[tokens_count - 1].valor = malloc(sizeof(char) * (strlen(palavra) + 1));
+			// Strcpy é utilizado para copiar strings
+			strcpy(tokens[tokens_count - 1].valor, palavra);
+		}
+
+		// Se o retorno é 2, significa que é uma operação
+		// No código abaixo vamos verificar a quantidade de asterisco (*), para validarmos se é uma operação de potenciação 
+		if(retorno == 2){
+			int tamanho = strlen(palavra);
+			int cont_asterisco = 0;
+
+			// Se chegarmos no final da string, verificamos a quantidade de * 
+			for (int i = 0; i < tamanho; i++) {
+				if (palavra[i] == '*'){
+					cont_asterisco++;
+					
+					if(cont_asterisco == tamanho){
+						// A mesma lógica utilizada quando o retorno é 1
+						tokens_count++;
+	      		tokens = realloc(tokens, sizeof(Info) * (tokens_count + 1));
+
+						// Switch para definir qual operação equivale a quantidade de *
+						if(cont_asterisco != 0){
+							switch (cont_asterisco) {
+								case 1:
+									tokens[tokens_count - 1].tipo = MULTIPLICACAO;
+									break;
+								case 2:
+									tokens[tokens_count - 1].tipo = POTENCIA;
+									break;
+								default:
+									tokens[tokens_count - 1].tipo = ERRO;
+							}
+						}
+					}
 				}
 
-				tokens_count++;
-				tokens = realloc(tokens, sizeof(Info ) * (tokens_count + 1));		
-			}
+				else if (palavra[i] == ' '){
+					continue;
+				} 
 
-			tokens[tokens_count - 1].tipo = INDETERMINADO;
-			tokens[tokens_count - 1].valor = c;
-			
-			contador = 0;
-	
-			switch (c) {
-				case '+':
-					tokens[tokens_count - 1].tipo = SOMA;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case '-':
-					tokens[tokens_count - 1].tipo = SUBTRACAO;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case '/':
-					tokens[tokens_count - 1].tipo = DIVISAO;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case '0':
-					tokens[tokens_count - 1].tipo = ZERO;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case '1':
-					tokens[tokens_count - 1].tipo = UM;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case '2':
-					tokens[tokens_count - 1].tipo = DOIS;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case '3':
-					tokens[tokens_count - 1].tipo = TRES;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case '4':
-					tokens[tokens_count - 1].tipo = QUATRO;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case '5':
-					tokens[tokens_count - 1].tipo = CINCO;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case '6':
-					tokens[tokens_count - 1].tipo = SEIS;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case '7':
-					tokens[tokens_count - 1].tipo = SETE;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case '8':
-					tokens[tokens_count - 1].tipo = OITO;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case '9':
-					tokens[tokens_count - 1].tipo = NOVE;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case '.':
-					tokens[tokens_count - 1].tipo = PONTO;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				case ',':
-					tokens[tokens_count - 1].tipo = VIRGULA;
-					tokens[tokens_count - 1].valor = c;
-					break;
-				default:
-					tokens[tokens_count - 1].tipo = INDETERMINADO;
-					tokens[tokens_count - 1].valor = c;
-					break;
-					// *count = tokens_count;
-					// return tokens;
-
-				tokens_count++;
-				tokens = realloc(tokens, sizeof(Info ) * (tokens_count + 1));		
+				// Se entrar no else, temos um operação que não envolve asterisco (*)
+		    else {
+					tokens_count++;
+					tokens = realloc(tokens, sizeof(Info) * (tokens_count + 1));
+				
+					switch (palavra[i]) {
+						case '+':
+							tokens[tokens_count - 1].tipo = SOMA;
+							break;
+						case '-':	
+							tokens[tokens_count - 1].tipo = SUBTRACAO;
+							break;
+						// case '*':	
+						// 	tokens[tokens_count - 1].tipo = MULTIPLICACAO;
+						// 	break;
+						case '/':	
+							tokens[tokens_count - 1].tipo = DIVISAO;
+							break;
+						default:
+							tokens[tokens_count - 1].tipo = INDETERMINADO;
+							break;
+					}
+				}
 			}
 		}
 	}
 
+	// Retorno o contador de tokens e o Tokens com as informações
 	*count = tokens_count;
-	return tokens;
+  return tokens;
 }
 
 int main(int argc, char **argv) {
 	char *vetor = malloc(sizeof(char)); 
+	
 	size_t count;
 	
+	int retorno;
+
+	// Leitura de arquivo
 	FILE *file;
   file = fopen(argv[1], "r");
 
@@ -179,82 +182,41 @@ int main(int argc, char **argv) {
   }
 	
 	int tokens_count;
-	
-	Info * tokens = tokenizar(file, &tokens_count);
-	
-	int v_Ponto = 0;
-	int v_Virgula = 0;
 
+	Info *tokens = lexer(file, &tokens_count);
+
+	// For utilizado para printar os dados retornados do Lexer
+	// Com base nas quantidades de tokens retornados, pegamos as informações de cada um e printamos na tela
 	for (int i = 0; i < tokens_count; i++) {
 		switch (tokens[i].tipo) {
-			case ZERO:
-				printf("0");
-				break;
-			case UM:
-				printf("1");
-				break;
-			case DOIS:
-				printf("2");
-				break;
-			case TRES:
-				printf("3");
-				break;
-			case QUATRO:
-				printf("4");
-				break;
-			case CINCO:
-				printf("5");
-				break;
-			case SEIS:
-				printf("6");
-				break;
-			case SETE:
-				printf("7");
-				break;
-			case OITO:
-				printf("8");
-				break;
-			case NOVE:
-				printf("9");
-				break;
-			case PONTO:
-				printf(".");
-				break;
-			case VIRGULA:
-				printf(",");
-				break;
+			case NUMERO:
+	      printf("%s\n", tokens[i].valor);
+	      break;
 			case SOMA:
-				printf("+");
-				break;
-			case SUBTRACAO:
-				printf("-");
-				break;
-			case DIVISAO:
-				printf("÷");
-				break;
-			case MULTIPLICACAO:
-				printf("×");
-				count++;
-				vetor = realloc(vetor, sizeof(char) * (count + 1));
-				vetor[count - 1] = '*';
-				break;
+	      printf("+\n");
+	      break;
+	    case SUBTRACAO:
+	      printf("-\n");
+	      break;
+	    case MULTIPLICACAO:
+	      printf("×\n");
+	      break;
+	    case DIVISAO:
+	      printf("÷\n");
+	      break;
 			case POTENCIA:
-				printf("^\n");
-				count++;
-				vetor = realloc(vetor, sizeof(char) * (count + 1));
-				vetor[count - 1] = '^';
-				break;
-			case INDETERMINADO:
-				printf("\nIndeterminado('%c')", tokens[i].valor);
-				break;
-			case ESPACO:
-				printf("\n");
+	      printf("^\n");
+	      break;
+	    case INDETERMINADO:
+	      printf("Indeterminado('%s')\n", tokens[i].valor);
+	      break;
+			case ERRO:
+				printf("Não foi possível identificar a operação\n");
 				break;
 		}
 	}
 	
-	free(tokens);
-	free(vetor);
+  free(tokens);
 	
 	return 0;
 }

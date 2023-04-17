@@ -3,9 +3,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <ctype.h>
 
 #define MAX  10000
 #define MIN -10000
+
+char *palavras[MAX];
+int qtd_palavras = 0;
 
 // Criação dos Tokens
 typedef enum {
@@ -25,6 +29,78 @@ typedef struct {
   Token tipo;
   char *valor;
 } Info;
+
+int verifica_caracter(char caracter) {
+  if (isdigit(caracter) == 0 && caracter != '.' && caracter != ',') {
+    return 0;
+  }
+  return 1;
+}
+
+void separa_palavra(FILE * file) {
+  char caracter;
+  char * numero = malloc(1000 * sizeof(char));
+  char * simbolo = malloc(1000 * sizeof(char));
+  int i = 0, j = 0;
+  int flag_numero = 0;
+  int flag_simbolo_duplo = 0; // Flag para verificar se o símbolo é duplo
+
+  while ((caracter = fgetc(file)) != EOF) {
+    int retorno = verifica_caracter(caracter);
+    if (retorno == 0) {
+      if (flag_numero) {
+        flag_numero = 0;
+        numero[j] = '\0';
+        palavras[qtd_palavras] = malloc((strlen(numero) + 1) * sizeof(char));
+        strcpy(palavras[qtd_palavras], numero);
+        qtd_palavras++;
+        j = 0;
+      }
+      
+      if (caracter != '.' && caracter != ',' && caracter != ' ') {
+        if (i == 0) {
+          simbolo[i] = caracter;
+          i++;
+        } else {
+          simbolo[i] = caracter;
+          simbolo[i+1] = '\0';
+          palavras[qtd_palavras] = malloc((strlen(simbolo) + 1) * sizeof(char));
+          strcpy(palavras[qtd_palavras], simbolo);
+          qtd_palavras++;
+          i = 0;
+          flag_simbolo_duplo = 1;
+        }
+      }
+    }
+    else {
+      if (!flag_numero) {
+        flag_numero = 1;
+        if (i > 0) {
+          simbolo[i] = '\0';
+          palavras[qtd_palavras] = malloc((strlen(simbolo) + 1) * sizeof(char));
+          strcpy(palavras[qtd_palavras], simbolo);
+          qtd_palavras++;
+          i = 0;
+        }
+        flag_simbolo_duplo = 0;
+      }
+      if (flag_simbolo_duplo) {
+        continue;
+      }
+      numero[j++] = caracter;
+    }
+  }
+
+  if (flag_numero) {
+    numero[j] = '\0';
+    palavras[qtd_palavras] = malloc((strlen(numero) + 1) * sizeof(char));
+    strcpy(palavras[qtd_palavras], numero);
+    qtd_palavras++;
+  }
+
+  free(numero);
+  free(simbolo);
+}
 
 // Função utilizada para verificar se é um número válido ou uma operação
 int verificacao(char *palavra) {
@@ -79,14 +155,17 @@ Info *lexer(FILE *file, int *count) {
   Info *tokens = malloc(sizeof(Info));
   int tokens_count = 0;
 
+  separa_palavra(file);
+  
   // Enquanto existir palavras para serem lidas dentro do arquivo de entrada
-  while (!feof(file)) {
+  for (int i = 0; i < qtd_palavras; i++) {
     char palavra[MAX];
     int retorno;
 
     // Passa a palavra lida dentro do arquivo do tipo FILE para um vetor do tipo
     // char
-    int scan = fscanf(file, "%s", palavra);
+    // int scan = fscanf(file, "%s", palavra);
+    strcpy(palavra, palavras[i]);
 
     retorno = verificacao(palavra);
 
@@ -100,7 +179,7 @@ Info *lexer(FILE *file, int *count) {
       // - 1 para colocar o novo elemento na posição correta
       tokens[tokens_count - 1].tipo = NUMERO;
       tokens[tokens_count - 1].valor =
-          malloc(sizeof(char) * (strlen(palavra) + 1));
+      malloc(sizeof(char) * (strlen(palavra) + 1));
       // Strcpy é utilizado para copiar strings
       strcpy(tokens[tokens_count - 1].valor, palavra);
     }
@@ -154,9 +233,6 @@ Info *lexer(FILE *file, int *count) {
           case '-':
             tokens[tokens_count - 1].tipo = SUBTRACAO;
             break;
-          // case '*':
-          // 	tokens[tokens_count - 1].tipo = MULTIPLICACAO;
-          // 	break;
           case '/':
             tokens[tokens_count - 1].tipo = DIVISAO;
             break;
@@ -185,7 +261,7 @@ Info *lexer(FILE *file, int *count) {
 
 // Parser
 double parser(Info *tokens, int *count) {
-  double expressao = 0.0;
+  double expressao = MIN;
 
   // Se existe algum Token
   if (count != 0) {
@@ -194,33 +270,33 @@ double parser(Info *tokens, int *count) {
       switch (tokens[i].tipo) {
       case SOMA:
         if(tokens[i+1].tipo == NUMERO){
-					expressao += atof(tokens[i + 1].valor);
-				}
+          expressao += atof(tokens[i + 1].valor);
+        }
         break;
       case SUBTRACAO:
         if(tokens[i+1].tipo == NUMERO){
-					expressao -= atof(tokens[i + 1].valor);
-				}
+          expressao -= atof(tokens[i + 1].valor);
+        }
         break;
       case DIVISAO:
         if(tokens[i+1].tipo == NUMERO){
-					expressao /= atof(tokens[i + 1].valor);
-				}
+          expressao /= atof(tokens[i + 1].valor);
+        }
         break;
       case MULTIPLICACAO:
         if(tokens[i+1].tipo == NUMERO){
-					expressao *= atof(tokens[i + 1].valor);
-				}
+          expressao *= atof(tokens[i + 1].valor);
+        }
         break;
       case POTENCIA:
         if(tokens[i+1].tipo == NUMERO){
-					 expressao = (pow(expressao, atof(tokens[i + 1].valor)));
-				}
+           expressao = (pow(expressao, atof(tokens[i + 1].valor)));
+        }
         break;
       case NUMERO:
-				if(expressao <= MIN){
-					expressao = atof(tokens[i].valor);
-				}
+        if(expressao == MIN){
+          expressao = atof(tokens[i].valor);
+        }
         break;
       case INVALIDO:
         return 0;
@@ -236,12 +312,6 @@ double parser(Info *tokens, int *count) {
 }
 
 int main(int argc, char **argv) {
-  char *vetor = malloc(sizeof(char));
-
-  size_t count;
-
-  int retorno;
-
   // Leitura de arquivo
   FILE *file;
   file = fopen(argv[1], "r");
